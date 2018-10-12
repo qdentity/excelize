@@ -34,6 +34,7 @@ type File struct {
 	Theme         *xlsxTheme
 	WorkBook      *xlsxWorkbook
 	WorkBookRels  *xlsxWorkbookRels
+	display       Display
 	XLSX          map[string][]byte
 }
 

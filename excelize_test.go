@@ -255,7 +255,7 @@ func TestColWidth(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	convertRowHeightToPixels(0)
+	xlsx.display.RowMap(0)
 }
 
 func TestRowHeight(t *testing.T) {
@@ -268,7 +268,7 @@ func TestRowHeight(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	convertColWidthToPixels(0)
+	xlsx.display.ColMap(0)
 }
 
 func TestSetCellHyperLink(t *testing.T) {

@@ -85,7 +85,7 @@ func parseFormatPictureSet(formatSet string) (*formatPicture, error) {
 // spreadsheet, "oneCell" (Move but don't size with cells) or "absolute"
 // (Don't move or size with cells). If you don't set this parameter, default
 // positioning is move and size with cells.
-func (f *File) AddPicture(sheet, cell, picture, format string) error {
+func (f *File) AddPicture(sheet, cell, picture, format string, twoAnchor bool) error {
 	var err error
 	// Check picture exists first.
 	if _, err = os.Stat(picture); os.IsNotExist(err) {
@@ -97,7 +97,7 @@ func (f *File) AddPicture(sheet, cell, picture, format string) error {
 	}
 	file, _ := ioutil.ReadFile(picture)
 	_, name := filepath.Split(picture)
-	return f.AddPictureFromBytes(sheet, cell, format, name, ext, file)
+	return f.AddPictureFromBytes(sheet, cell, format, name, ext, file, twoAnchor)
 }
 
 // AddPictureFromBytes provides the method to add picture in a sheet by given
@@ -131,7 +131,7 @@ func (f *File) AddPicture(sheet, cell, picture, format string) error {
 //        }
 //    }
 //
-func (f *File) AddPictureFromBytes(sheet, cell, format, name, extension string, file []byte) error {
+func (f *File) AddPictureFromBytes(sheet, cell, format, name, extension string, file []byte, twoAnchor bool) error {
 	var err error
 	var drawingHyperlinkRID int
 	var hyperlinkType string
@@ -162,7 +162,7 @@ func (f *File) AddPictureFromBytes(sheet, cell, format, name, extension string, 
 		}
 		drawingHyperlinkRID = f.addDrawingRelationships(drawingID, SourceRelationshipHyperLink, formatSet.Hyperlink, hyperlinkType)
 	}
-	f.addDrawingPicture(sheet, drawingXML, cell, name, image.Width, image.Height, drawingRID, drawingHyperlinkRID, formatSet)
+	f.addDrawingPicture(sheet, drawingXML, cell, name, image.Width, image.Height, drawingRID, drawingHyperlinkRID, formatSet, twoAnchor)
 	f.addMedia(file, ext)
 	f.addContentTypePart(drawingID, "drawings")
 	return err
@@ -263,54 +263,93 @@ func (f *File) countDrawings() int {
 // addDrawingPicture provides a function to add picture by given sheet,
 // drawingXML, cell, file name, width, height relationship index and format
 // sets.
-func (f *File) addDrawingPicture(sheet, drawingXML, cell, file string, width, height, rID, hyperlinkRID int, formatSet *formatPicture) {
+func (f *File) addDrawingPicture(sheet, drawingXML, cell, file string, width, height, rID, hyperlinkRID int, formatSet *formatPicture, twoCell bool) {
+	// Retrieve initial positioning
 	cell = strings.ToUpper(cell)
 	fromCol := string(strings.Map(letterOnlyMapF, cell))
 	fromRow, _ := strconv.Atoi(strings.Map(intOnlyMapF, cell))
 	row := fromRow - 1
 	col := TitleToNumber(fromCol)
+
+	// Determine image position
 	width = int(float64(width) * formatSet.XScale)
 	height = int(float64(height) * formatSet.YScale)
 	colStart, rowStart, _, _, colEnd, rowEnd, x2, y2 := f.positionObjectPixels(sheet, col, row, formatSet.OffsetX, formatSet.OffsetY, width, height)
-	content := xlsxWsDr{}
-	content.A = NameSpaceDrawingML
-	content.Xdr = NameSpaceDrawingMLSpreadSheet
+
+	// Set main xml content container
+	content := xlsxWsDr{
+		A: NameSpaceDrawingML,
+		Xdr: NameSpaceDrawingMLSpreadSheet,
+	}
+
+	// Set picture xml
 	cNvPrID := f.drawingParser(drawingXML, &content)
-	twoCellAnchor := xdrCellAnchor{}
-	twoCellAnchor.EditAs = formatSet.Positioning
-	from := xlsxFrom{}
-	from.Col = colStart
-	from.ColOff = formatSet.OffsetX * EMU
-	from.Row = rowStart
-	from.RowOff = formatSet.OffsetY * EMU
-	to := xlsxTo{}
-	to.Col = colEnd
-	to.ColOff = x2 * EMU
-	to.Row = rowEnd
-	to.RowOff = y2 * EMU
-	twoCellAnchor.From = &from
-	twoCellAnchor.To = &to
-	pic := xlsxPic{}
-	pic.NvPicPr.CNvPicPr.PicLocks.NoChangeAspect = formatSet.NoChangeAspect
-	pic.NvPicPr.CNvPr.ID = f.countCharts() + f.countMedia() + 1
-	pic.NvPicPr.CNvPr.Descr = file
-	pic.NvPicPr.CNvPr.Name = "Picture " + strconv.Itoa(cNvPrID)
+
+	pic := xlsxPic{
+		NvPicPr: xlsxNvPicPr{
+			CNvPr: xlsxCNvPr{
+				ID: f.countCharts() + f.countMedia() + 1,
+				Descr: file,
+				Name: "Picture " + strconv.Itoa(cNvPrID),
+			},
+			CNvPicPr: xlsxCNvPicPr{
+				PicLocks: xlsxPicLocks{
+					NoChangeAspect: formatSet.NoChangeAspect,
+				},
+			},
+		},
+		BlipFill: xlsxBlipFill{
+			Blip: xlsxBlip{
+				R: SourceRelationship,
+				Embed: "rId" + strconv.Itoa(rID),
+			},
+		},
+		SpPr: xlsxSpPr{ PrstGeom: xlsxPrstGeom{ Prst: "rect" } },
+	}
+
 	if hyperlinkRID != 0 {
 		pic.NvPicPr.CNvPr.HlinkClick = &xlsxHlinkClick{
 			R:   SourceRelationship,
 			RID: "rId" + strconv.Itoa(hyperlinkRID),
 		}
 	}
-	pic.BlipFill.Blip.R = SourceRelationship
-	pic.BlipFill.Blip.Embed = "rId" + strconv.Itoa(rID)
-	pic.SpPr.PrstGeom.Prst = "rect"
 
-	twoCellAnchor.Pic = &pic
-	twoCellAnchor.ClientData = &xdrClientData{
-		FLocksWithSheet:  formatSet.FLocksWithSheet,
-		FPrintsWithSheet: formatSet.FPrintsWithSheet,
+	// Setup the anchoring for the image
+	anchor := xdrCellAnchor{
+		From: &xlsxFrom{
+			Col: colStart,
+			ColOff: formatSet.OffsetX * f.display.emuPerPixel,
+			Row: rowStart,
+			RowOff: formatSet.OffsetY * f.display.emuPerPixel,
+		},
+		Pic: &pic,
+		ClientData: &xdrClientData{
+			FLocksWithSheet:  formatSet.FLocksWithSheet,
+			FPrintsWithSheet: formatSet.FPrintsWithSheet,
+		},
 	}
-	content.TwoCellAnchor = append(content.TwoCellAnchor, &twoCellAnchor)
+
+	if twoCell {
+		// Anchor the image using two anchors
+		anchor.EditAs = formatSet.Positioning
+		anchor.To = &xlsxTo{
+			Col: colEnd,
+			ColOff: x2 * f.display.emuPerPixel,
+			Row: rowEnd,
+			RowOff: y2 * f.display.emuPerPixel,
+		}
+
+		content.TwoCellAnchor = append(content.TwoCellAnchor, &anchor)
+	} else {
+		// Anchor the image using a single anchor
+		anchor.Ext = &xlsxExt{
+			Cx: width * f.display.emuPerPixel,
+			Cy: height * f.display.emuPerPixel,
+		}
+
+		content.OneCellAnchor = append(content.OneCellAnchor, &anchor)
+	}
+
 	output, _ := xml.Marshal(content)
 	f.saveFileList(drawingXML, output)
 }

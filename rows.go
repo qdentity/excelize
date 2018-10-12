@@ -14,7 +14,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"math"
 	"strconv"
 	"strings"
 )
@@ -217,14 +216,14 @@ func (f *File) getRowHeight(sheet string, row int) int {
 	xlsx := f.workSheetReader(sheet)
 	for _, v := range xlsx.SheetData.Row {
 		if v.R == row+1 && v.Ht != 0 {
-			return int(convertRowHeightToPixels(v.Ht))
+			return f.display.RowMap(v.Ht)
 		}
 	}
 	// Optimisation for when the row heights haven't changed.
-	return int(defaultRowHeightPixels)
+	return f.display.rowPixelsDefault
 }
 
-// GetRowHeight provides a function to get row height by given worksheet name
+// GetRowHeight provides a function to get row height in units by given worksheet name
 // and row index. For example, get the height of the first row in Sheet1:
 //
 //    xlsx.GetRowHeight("Sheet1", 1)
@@ -237,7 +236,7 @@ func (f *File) GetRowHeight(sheet string, row int) float64 {
 		}
 	}
 	// Optimisation for when the row heights haven't changed.
-	return defaultRowHeightPixels
+	return f.display.RowUnitsDefault
 }
 
 // sharedStringsReader provides a function to get the pointer to the structure
@@ -456,16 +455,4 @@ func completeRow(xlsx *xlsxWorksheet, row, cell int) {
 			}
 		}
 	}
-}
-
-// convertRowHeightToPixels provides a function to convert the height of a
-// cell from user's units to pixels. If the height hasn't been set by the user
-// we use the default value. If the row is hidden it has a value of zero.
-func convertRowHeightToPixels(height float64) float64 {
-	var pixels float64
-	if height == 0 {
-		return pixels
-	}
-	pixels = math.Ceil(4.0 / 3.0 * height)
-	return pixels
 }

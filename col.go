@@ -11,16 +11,8 @@ package excelize
 
 import (
 	"bytes"
-	"math"
 	"strconv"
 	"strings"
-)
-
-// Define the default cell size and EMU unit of measurement.
-const (
-	defaultColWidthPixels  float64 = 64
-	defaultRowHeightPixels float64 = 20
-	EMU                    int     = 9525
 )
 
 // GetColVisible provides a function to get visible of a single column by given
@@ -251,16 +243,20 @@ func (f *File) positionObjectPixels(sheet string, colStart, rowStart, x1, y1, wi
 	height += y1
 
 	// Subtract the underlying cell widths to find end cell of the object.
+	colEnd++ // temporary offset because of 1-based width indexing
 	for width >= f.getColWidth(sheet, colEnd) {
-		colEnd++
 		width -= f.getColWidth(sheet, colEnd)
+		colEnd++
 	}
+	colEnd--
 
 	// Subtract the underlying cell heights to find end cell of the object.
+	rowEnd++ // temporary offset because of 1-based height indexing
 	for height >= f.getRowHeight(sheet, rowEnd) {
-		rowEnd++
 		height -= f.getRowHeight(sheet, rowEnd)
+		rowEnd++
 	}
+	rowEnd--
 
 	// The end vertices are whatever is left from the width and height.
 	x2 := width
@@ -280,14 +276,14 @@ func (f *File) getColWidth(sheet string, col int) int {
 			}
 		}
 		if width != 0 {
-			return int(convertColWidthToPixels(width))
+			return f.display.ColMap(width)
 		}
 	}
 	// Optimisation for when the column widths haven't changed.
-	return int(defaultColWidthPixels)
+	return f.display.colPixelsDefault
 }
 
-// GetColWidth provides a function to get column width by given worksheet name
+// GetColWidth provides a function to get column width in units by given worksheet name
 // and column index.
 func (f *File) GetColWidth(sheet, column string) float64 {
 	col := TitleToNumber(strings.ToUpper(column)) + 1
@@ -304,7 +300,7 @@ func (f *File) GetColWidth(sheet, column string) float64 {
 		}
 	}
 	// Optimisation for when the column widths haven't changed.
-	return defaultColWidthPixels
+	return f.display.ColUnitsDefault
 }
 
 // InsertCol provides a function to insert a new column before given column
@@ -353,23 +349,4 @@ func completeCol(xlsx *xlsxWorksheet, row, cell int) {
 			}
 		}
 	}
-}
-
-// convertColWidthToPixels provieds function to convert the width of a cell
-// from user's units to pixels. Excel rounds the column width to the nearest
-// pixel. If the width hasn't been set by the user we use the default value.
-// If the column is hidden it has a value of zero.
-func convertColWidthToPixels(width float64) float64 {
-	var padding float64 = 5
-	var pixels float64
-	var maxDigitWidth float64 = 7
-	if width == 0 {
-		return pixels
-	}
-	if width < 1 {
-		pixels = (width * 12) + 0.5
-		return math.Ceil(pixels)
-	}
-	pixels = (width*maxDigitWidth + 0.5) + padding
-	return math.Ceil(pixels)
 }

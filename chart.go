@@ -1135,14 +1135,14 @@ func (f *File) addDrawingChart(sheet, drawingXML, cell string, width, height, rI
 	twoCellAnchor.EditAs = formatSet.Positioning
 	from := xlsxFrom{}
 	from.Col = colStart
-	from.ColOff = formatSet.OffsetX * EMU
+	from.ColOff = formatSet.OffsetX * f.display.emuPerPixel
 	from.Row = rowStart
-	from.RowOff = formatSet.OffsetY * EMU
+	from.RowOff = formatSet.OffsetY * f.display.emuPerPixel
 	to := xlsxTo{}
 	to.Col = colEnd
-	to.ColOff = x2 * EMU
+	to.ColOff = x2 * f.display.emuPerPixel
 	to.Row = rowEnd
-	to.RowOff = y2 * EMU
+	to.RowOff = y2 * f.display.emuPerPixel
 	twoCellAnchor.From = &from
 	twoCellAnchor.To = &to
 
