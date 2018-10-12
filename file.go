@@ -46,6 +46,7 @@ func NewFile() *File {
 	f.Sheet["xl/worksheets/sheet1.xml"] = f.workSheetReader("Sheet1")
 	f.sheetMap["Sheet1"] = "xl/worksheets/sheet1.xml"
 	f.Theme = f.themeReader()
+	f.display = defaultDisplay()
 	return f
 }
 
