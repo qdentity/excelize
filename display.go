@@ -1,5 +1,7 @@
 package excelize
 
+import "math"
+
 const (
 	EMUPerInch = 914400
 )
@@ -23,11 +25,23 @@ type Display struct {
 func defaultDisplay() Display {
 	result := Display{
 		ColMap: func(units float64) int {
-			return 0
+			if units <= 0 {
+				return 0
+			}
+
+			if units <= 1 {
+				return int(math.Ceil(units * 13))
+			}
+
+			return int(math.Ceil(8*units+5)) // TODO: Check these on a windows machine
 		},
 		ColUnitsDefault: 10,
 		RowMap: func(units float64) int {
-			return 0
+			if units <= 0 {
+				return 0
+			}
+
+			return int(math.Ceil(units*4/3))
 		},
 		RowUnitsDefault: 15,
 		DPI:             96,
